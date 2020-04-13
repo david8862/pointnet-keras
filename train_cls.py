@@ -8,18 +8,18 @@ Created on Thu Dec 28 15:39:40 2017
 import numpy as np
 import os
 import tensorflow as tf
-from keras import optimizers
-from keras.layers import Input
-from keras.models import Model
-from keras.layers import Dense, Flatten, Reshape, Dropout
-from keras.layers import Convolution1D, MaxPooling1D, BatchNormalization
-from keras.layers import Lambda
-from keras.utils import np_utils
+from tensorflow.keras import optimizers
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Flatten, Reshape, Dropout, dot
+from tensorflow.keras.layers import Convolution1D, MaxPooling1D, BatchNormalization
+#from tensorflow.keras.layers import Lambda
+from tensorflow.keras.utils import to_categorical
 import h5py
 
 
-def mat_mul(A, B):
-    return tf.matmul(A, B)
+#def mat_mul(A, B):
+    #return tf.matmul(A, B)
 
 
 def load_h5(h5_filename):
@@ -92,7 +92,8 @@ x = Dense(9, weights=[np.zeros([256, 9]), np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]).
 input_T = Reshape((3, 3))(x)
 
 # forward net
-g = Lambda(mat_mul, arguments={'B': input_T})(input_points)
+#g = Lambda(mat_mul, arguments={'B': input_T})(input_points)
+g = dot([input_points, input_T], axes=-1)
 g = Convolution1D(64, 1, input_shape=(num_points, 3), activation='relu')(g)
 g = BatchNormalization()(g)
 g = Convolution1D(64, 1, input_shape=(num_points, 3), activation='relu')(g)
@@ -114,7 +115,8 @@ f = Dense(64 * 64, weights=[np.zeros([256, 64 * 64]), np.eye(64).flatten().astyp
 feature_T = Reshape((64, 64))(f)
 
 # forward net
-g = Lambda(mat_mul, arguments={'B': feature_T})(g)
+#g = Lambda(mat_mul, arguments={'B': feature_T})(g)
+g = dot([g, feature_T], axes=-1)
 g = Convolution1D(64, 1, activation='relu')(g)
 g = BatchNormalization()(g)
 g = Convolution1D(128, 1, activation='relu')(g)
@@ -183,8 +185,8 @@ test_labels_r = test_labels.reshape(-1, 1)
 
 
 # label to categorical
-Y_train = np_utils.to_categorical(train_labels_r, k)
-Y_test = np_utils.to_categorical(test_labels_r, k)
+Y_train = to_categorical(train_labels_r, k)
+Y_test = to_categorical(test_labels_r, k)
 
 # compile classification model
 model.compile(optimizer='adam',
@@ -197,7 +199,7 @@ for i in range(1,50):
     # rotate and jitter the points
     train_points_rotate = rotate_point_cloud(train_points_r)
     train_points_jitter = jitter_point_cloud(train_points_rotate)
-    model.fit(train_points_jitter, Y_train, batch_size=32, epochs=1, shuffle=True, verbose=1)
+    model.fit(train_points_jitter, Y_train, batch_size=8, epochs=1, shuffle=True, verbose=1)
     s = "Current epoch is:" + str(i)
     print(s)
     if i % 5 == 0:
